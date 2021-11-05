@@ -1,0 +1,156 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Ash Thompson"
+date: "05 November 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+#set cache=TRUE before finalising
+
+```
+
+# Overview
+This is the report for the course project of Practical Machine Learning.
+The goal of this project is to predict the manner in which they did the exercise.
+This is the "classe" variable in the training set. 
+
+# Summary
+
+The initial data was extensive with 160 variables, but most were not useful due 
+to large amounts of N/A's or having no variance. So I cleaned out those variables, 
+and the obivous label and ID variables, leaving me with 54 remaining to model.
+
+The training set was then split into training and validation, leaving the testing
+set for later as the 20 cases will be used for the quiz portion.
+
+Models were built using the training data, and tested against the validation data.
+
+The first model was built using a decision tree. It was fast to run but had poor
+accuracy.
+
+The second model was built using Random Forest, which took a long time to run but
+did have great accuracy at 99.7%. The settings that I chose were the ones that 
+seemed to reduce the run time the best without compromising accuracy.
+
+The model I chose to use for the quiz was the Random Forest.
+
+
+# Stage 1 - Reading the CSVs and setting up the enviroment
+
+
+```{r}
+
+library(caret)
+library(dplyr)
+library(rattle)
+
+set.seed(900)
+
+fileUrlTrain = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+fileUrlTest = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+trainingOrig <- read.csv(url(fileUrlTrain))
+testingOrig  <- read.csv(url(fileUrlTest))
+
+```
+
+# Stage 2 - Cleaning the data
+
+#Clean out variables with high amount of NAs
+```{r}
+
+NAsTraining <- sapply(trainingOrig, function(x) mean(is.na(x))) < 0.80
+NAsTesting  <- sapply(testingOrig, function(x) mean(is.na(x))) < 0.80
+
+training <- trainingOrig[, which(NAsTraining)]
+testing  <- testingOrig[, which(NAsTesting)]
+
+```
+
+#using nearZeroVar function to tag and remove columns with near zero variance
+```{r}
+
+NZV <- nearZeroVar(training)
+
+training <- training[,-NZV]
+testing <- testing[,-NZV]
+
+```
+
+# remove ID, name and timestamps from both
+```{r}
+
+training <- training[,-(1:5)]
+testing <- testing[,-(1:5)]
+
+```
+
+# Stage 3 - split off a validation set from the training set
+```{r}
+
+inTrain <-createDataPartition(training$classe, p = 0.8, list=FALSE)
+validation <- training[-inTrain,]
+training <- training[inTrain,]
+
+```
+
+# Stage 4 - creating the models
+
+## model 1 - Decision Tree using rpart method in train
+```{r}
+fitRPart <- train(classe ~ ., data=training, method="rpart")
+
+# R Part Prediction
+
+predRPart <- predict(fitRPart, validation)
+
+cmRPart <- confusionMatrix(predRPart, validation$classe)
+
+cmRPart
+
+cmRPart$overall['Accuracy']
+```
+
+
+# model 2 - Random Forest using rf method in train
+```{r}
+
+control <- trainControl(method="cv", number=3, verboseIter=FALSE, allowParallel = TRUE)
+fitRF <- train(classe ~ ., data=training, method="rf", trControl=control, tuneLength = 5)
+
+
+# Random Forest prediction 
+
+predRF <- predict(fitRF, validation)
+
+cmRF <- confusionMatrix(predRF, validation$classe)
+
+cmRF
+
+cmRF$overall['Accuracy']
+
+```
+
+# Conclusion
+The Random Forest model had a very high accuracy, so will be used for the quiz 
+predictions.
+
+
+## Appendix - Plots and details
+
+Below are the plots/details of the 3 models:
+
+Decision Tree:
+```{r, echo=FALSE}
+plot(fitRPart)
+cmRPart
+```
+
+Random Forest:
+```{r, echo=FALSE}
+cmRF
+```
+
